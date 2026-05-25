@@ -33,7 +33,7 @@ ENV PORT=3000
 CMD ["go", "run", "./cmd/server"]
 
 # Frontend builder stage for production
-FROM dhi.io/node:22-debian13-dev AS frontend-builder
+FROM node:22-bookworm AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -96,10 +96,13 @@ RUN apk add --no-cache wget unzip jq \
     && echo "${VER}" > /ssg-content/.ssg-version \
     && rm -rf /tmp/ssg.zip /tmp/ssg-extract
 
-# Production stage — hardened Alpine runtime (no -dev; no shell/apk). Use 3.23 for production.
-FROM dhi.io/alpine-base:3.23
+# Production stage — Alpine runtime. Originally dhi.io/alpine-base (Docker
+# Hardened Images, paywalled); swapped to public alpine for self-hosted builds.
+# We install ca-certificates, tzdata, and wget here since plain alpine doesn't
+# include them.
+FROM alpine:3.23
 
-# Runtime image has no apk; ca-certificates/tzdata are in the base. No RUN needed.
+RUN apk add --no-cache ca-certificates tzdata wget
 
 WORKDIR /app
 
