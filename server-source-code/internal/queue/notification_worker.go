@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"mime/quotedprintable"
 	"net"
 	"net/http"
 	"net/smtp"
@@ -142,6 +143,23 @@ func isSlackIncomingWebhookURL(raw string) bool {
 		return false
 	}
 	return strings.HasPrefix(u.Path, "/services/")
+}
+
+// isMattermostWebhookURL detects a Mattermost incoming webhook, whose URL
+// always has the path form "/hooks/<token>" on a self-hosted (arbitrary) host.
+// Mattermost incoming webhooks accept Slack-compatible payloads, so these are
+// rendered with the Slack body builder. Plain JSON (the generic default) is
+// rejected by Mattermost with HTTP 400. See issue #851.
+func isMattermostWebhookURL(raw string) bool {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return false
+	}
+	// Exclude Slack, which is matched separately by host.
+	if strings.ToLower(u.Hostname()) == "hooks.slack.com" {
+		return false
+	}
+	return strings.HasPrefix(u.Path, "/hooks/")
 }
 
 func truncateUTF8(s string, maxRunes int) string {
@@ -620,6 +638,9 @@ func (h *NotificationDeliverHandler) sendWebhook(ctx context.Context, plain stri
 		b, err = discordWebhookBody(p)
 	case isSlackIncomingWebhookURL(cfg.URL):
 		b, err = slackIncomingWebhookBody(p)
+	case isMattermostWebhookURL(cfg.URL):
+		// Mattermost accepts Slack-compatible incoming webhook payloads.
+		b, err = slackIncomingWebhookBody(p)
 	default:
 		body := map[string]interface{}{
 			"event_type": p.EventType,
@@ -744,6 +765,22 @@ func buildEmailHTML(p notifications.NotificationDeliverPayload) string {
 	return sb.String()
 }
 
+// unencryptedAuth wraps an smtp.Auth so credentials may be sent over a
+// plaintext (non-TLS) connection. Go's smtp.PlainAuth refuses to transmit
+// credentials unless the connection is encrypted or the server is localhost.
+// When the operator has explicitly disabled TLS (e.g. a trusted internal
+// relay that only listens for plaintext SMTP AUTH), this wrapper reports the
+// connection as encrypted so the underlying auth proceeds. See issue #817.
+type unencryptedAuth struct {
+	smtp.Auth
+}
+
+func (a unencryptedAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	s := *server
+	s.TLS = true
+	return a.Auth.Start(&s)
+}
+
 func (h *NotificationDeliverHandler) sendEmail(ctx context.Context, plain string, p notifications.NotificationDeliverPayload) error {
 	var cfg emailConfig
 	if err := json.Unmarshal([]byte(plain), &cfg); err != nil {
@@ -759,12 +796,28 @@ func (h *NotificationDeliverHandler) sendEmail(ctx context.Context, plain string
 	// Sanitize subject to prevent SMTP header injection via \r\n in host names / alert titles.
 	subject = strings.NewReplacer("\r", "", "\n", "").Replace(subject)
 	html := buildEmailHTML(p)
-	msg := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n%s",
-		cfg.From, cfg.To, subject, html))
+	// Encode the HTML body as quoted-printable so no single line exceeds the
+	// 998-octet limit from RFC 5322; the generated HTML is a single long line
+	// and strict relays reject it otherwise. See issue #845.
+	var qpBody bytes.Buffer
+	qpw := quotedprintable.NewWriter(&qpBody)
+	if _, err := qpw.Write([]byte(html)); err != nil {
+		return err
+	}
+	if err := qpw.Close(); err != nil {
+		return err
+	}
+	msg := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n%s",
+		cfg.From, cfg.To, subject, qpBody.String()))
 	addr := cfg.SMTPHost + ":" + strconv.Itoa(cfg.SMTPPort)
 	var auth smtp.Auth
 	if cfg.Username != "" {
 		auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.SMTPHost)
+		// When TLS is explicitly disabled, allow PlainAuth over the plaintext
+		// connection instead of failing with "unencrypted connection".
+		if !cfg.UseTLS {
+			auth = unencryptedAuth{auth}
+		}
 	}
 	tlsCfg := &tls.Config{ServerName: cfg.SMTPHost, MinVersion: tls.VersionTLS12}
 
