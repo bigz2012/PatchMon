@@ -460,11 +460,15 @@ elif command -v zypper >/dev/null 2>&1; then
     info "Installing curl..."
     install_zypper_packages curl
 elif command -v pacman >/dev/null 2>&1; then
-    # Arch Linux
+    # Arch Linux / Manjaro
     info "Detected pacman (Arch Linux)"
     echo ""
-    info "Installing curl..."
-    install_pacman_packages curl
+    # pacman-contrib provides "checkupdates", which the agent uses to enumerate
+    # available updates; it in turn relies on fakeroot. Neither is installed by
+    # default on Arch/Manjaro, so install them alongside curl or the first
+    # system report fails to send any package data. See issue #850.
+    info "Installing curl, pacman-contrib, and fakeroot..."
+    install_pacman_packages curl pacman-contrib fakeroot
 elif command -v apk >/dev/null 2>&1; then
     # Alpine Linux
     info "Detected apk (Alpine Linux)"
