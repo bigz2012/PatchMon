@@ -7,7 +7,7 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 import { AUTH_PHASES, isAuthPhase } from "../constants/authPhases";
-import { isCorsError } from "../utils/api";
+import { isCorsError, setGlobalTimezone } from "../utils/api";
 
 // Development-only logging to prevent error details exposure in production
 const isDev = import.meta.env.DEV;
@@ -27,6 +27,13 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
 	const [user, setUser] = useState(null);
 	const [token, setToken] = useState(null);
+
+	// Keep the global date-formatting timezone in sync with the user's
+	// preference so formatDate()/formatDateOnly() render in their timezone
+	// everywhere. Empty/unset falls back to the browser locale (#786).
+	useEffect(() => {
+		setGlobalTimezone(user?.timezone || null);
+	}, [user?.timezone]);
 	const [permissions, setPermissions] = useState(null);
 	// Multi-context (tenant) info from GET /api/v1/me/context. Drives per-module feature flags
 	// so the UI hides nav entries, settings panels, and buttons for disabled modules instead

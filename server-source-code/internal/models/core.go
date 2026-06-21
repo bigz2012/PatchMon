@@ -30,6 +30,7 @@ type User struct {
 	DiscordLinkedAt        *time.Time `db:"discord_linked_at"`
 	NewsletterSubscribed   bool       `db:"newsletter_subscribed"`
 	NewsletterSubscribedAt *time.Time `db:"newsletter_subscribed_at"`
+	Timezone               *string    `db:"timezone"`
 }
 
 // UserSession matches user_sessions table.

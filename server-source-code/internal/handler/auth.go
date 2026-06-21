@@ -957,6 +957,18 @@ func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	} else if _, hasLast := req["lastName"]; hasLast {
 		u.LastName = lastName
 	}
+	// timezone: key present with empty string clears it (fall back to browser
+	// default); a non-empty value must be a valid IANA timezone name (#786).
+	if _, hasTz := req["timezone"]; hasTz {
+		tz := extractName("timezone")
+		if tz != nil {
+			if _, err := time.LoadLocation(*tz); err != nil {
+				Error(w, http.StatusBadRequest, "Invalid timezone: must be a valid IANA timezone name (e.g. Australia/Brisbane)")
+				return
+			}
+		}
+		u.Timezone = tz
+	}
 	// Check username/email uniqueness excluding current user
 	checkUsername := u.Username
 	checkEmail := u.Email
@@ -1483,6 +1495,9 @@ func userToResponse(u *models.User, acceptedVersions []string) map[string]interf
 	res["newsletter_subscribed"] = u.NewsletterSubscribed
 	if u.NewsletterSubscribedAt != nil {
 		res["newsletter_subscribed_at"] = u.NewsletterSubscribedAt.Format(time.RFC3339)
+	}
+	if u.Timezone != nil {
+		res["timezone"] = *u.Timezone
 	}
 	if acceptedVersions != nil {
 		res["accepted_release_notes_versions"] = acceptedVersions

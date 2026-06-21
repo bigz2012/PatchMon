@@ -178,6 +178,7 @@ func (s *DashboardStore) GetHomepageStats(ctx context.Context) (map[string]inter
 		"total_outdated_packages":     int(stats.TotalOutdatedPackages),
 		"total_repos":                 int(stats.TotalRepos),
 		"hosts_needing_updates":       hostsNeedingUpdates,
+		"hosts_needing_reboot":        int(stats.HostsNeedingReboot),
 		"up_to_date_hosts":            upToDateHosts,
 		"security_updates":            int(stats.SecurityUpdates),
 		"hosts_with_security_updates": int(stats.HostsWithSecurityUpdates),

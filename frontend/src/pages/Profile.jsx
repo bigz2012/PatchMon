@@ -49,6 +49,12 @@ const Profile = () => {
 	const emailId = useId();
 	const firstNameId = useId();
 	const lastNameId = useId();
+	const timezoneId = useId();
+	// Full IANA timezone list (supported by modern browsers); fall back to UTC.
+	const timezoneOptions =
+		typeof Intl.supportedValuesOf === "function"
+			? Intl.supportedValuesOf("timeZone")
+			: ["UTC"];
 	const currentPasswordId = useId();
 	const newPasswordId = useId();
 	const confirmPasswordId = useId();
@@ -91,6 +97,7 @@ const Profile = () => {
 		email: user?.email || "",
 		first_name: user?.first_name || "",
 		last_name: user?.last_name || "",
+		timezone: user?.timezone || "",
 	});
 
 	// Update profileData when user data changes
@@ -101,6 +108,7 @@ const Profile = () => {
 				email: user.email || "",
 				first_name: user.first_name || "",
 				last_name: user.last_name || "",
+				timezone: user.timezone || "",
 			});
 		}
 	}, [user]);
@@ -528,6 +536,47 @@ const Profile = () => {
 												/>
 											</div>
 										</div>
+									</div>
+
+									<div className="mt-6">
+										<label
+											htmlFor={timezoneId}
+											className="block text-sm font-medium text-secondary-700 dark:text-secondary-200"
+										>
+											Timezone
+											{isOIDCUser && (
+												<span className="ml-2 text-xs text-secondary-500 dark:text-white italic">
+													(Managed by OIDC provider)
+												</span>
+											)}
+										</label>
+										<div className="mt-1">
+											<select
+												name="timezone"
+												id={timezoneId}
+												value={profileData.timezone}
+												onChange={handleInputChange}
+												disabled={isOIDCUser}
+												className={`${FORM_INPUT_CLASS} ${
+													isOIDCUser
+														? "bg-secondary-100 dark:bg-secondary-800 text-secondary-500 dark:text-white cursor-not-allowed"
+														: ""
+												}`}
+											>
+												<option value="">
+													Browser default (
+													{Intl.DateTimeFormat().resolvedOptions().timeZone})
+												</option>
+												{timezoneOptions.map((tz) => (
+													<option key={tz} value={tz}>
+														{tz}
+													</option>
+												))}
+											</select>
+										</div>
+										<p className="mt-1 text-xs text-secondary-500 dark:text-white">
+											Used to display dates and times throughout the app.
+										</p>
 									</div>
 								</div>
 

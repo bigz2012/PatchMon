@@ -228,6 +228,7 @@ func (s *UsersStore) Create(ctx context.Context, u *models.User) error {
 		LastName:        u.LastName,
 		ThemePreference: u.ThemePreference,
 		ColorTheme:      u.ColorTheme,
+		Timezone:        u.Timezone,
 	}
 	return d.Queries.CreateUser(ctx, arg)
 }
@@ -246,6 +247,7 @@ func (s *UsersStore) Update(ctx context.Context, u *models.User) error {
 		LastName:        u.LastName,
 		ThemePreference: u.ThemePreference,
 		ColorTheme:      u.ColorTheme,
+		Timezone:        u.Timezone,
 		ID:              u.ID,
 	}
 	return d.Queries.UpdateUser(ctx, arg)

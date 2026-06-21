@@ -63,10 +63,10 @@ UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2;
 -- name: CreateUser :exec
 INSERT INTO users (
     id, username, email, password_hash, role, is_active, created_at, updated_at,
-    tfa_enabled, first_name, last_name, theme_preference, color_theme
+    tfa_enabled, first_name, last_name, theme_preference, color_theme, timezone
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8,
-    $9, $10, $11, $12, $13
+    $9, $10, $11, $12, $13, $14
 );
 
 -- name: CreateOidcUser :exec
@@ -84,8 +84,8 @@ INSERT INTO users (
 UPDATE users SET
     username = $1, email = $2, role = $3, is_active = $4,
     updated_at = $5, first_name = $6, last_name = $7,
-    theme_preference = $8, color_theme = $9
-WHERE id = $10;
+    theme_preference = $8, color_theme = $9, timezone = $10
+WHERE id = $11;
 
 -- name: UpdateUserOidcLink :exec
 UPDATE users SET

@@ -143,10 +143,13 @@ ORDER BY friendly_name ASC;
 
 -- name: GetHomepageStats :one
 WITH active_hosts AS (
-    SELECT id FROM hosts WHERE status = 'active'
+    SELECT id, needs_reboot FROM hosts WHERE status = 'active'
 ),
 host_counts AS (
-    SELECT COUNT(*)::int AS total_hosts FROM active_hosts
+    SELECT
+        COUNT(*)::int AS total_hosts,
+        COUNT(*) FILTER (WHERE needs_reboot = true)::int AS hosts_needing_reboot
+    FROM active_hosts
 ),
 hosts_needing_updates AS (
     SELECT COUNT(DISTINCT hp.host_id)::int AS cnt
@@ -174,7 +177,8 @@ SELECT
     pc.security_updates AS security_updates,
     hws.cnt AS hosts_with_security_updates,
     (SELECT COUNT(*)::int FROM repositories WHERE is_active = true) AS total_repos,
-    (SELECT COUNT(*)::int FROM update_history WHERE timestamp >= sqlc.arg('since') AND status = 'success') AS recent_updates_24h
+    (SELECT COUNT(*)::int FROM update_history WHERE timestamp >= sqlc.arg('since') AND status = 'success') AS recent_updates_24h,
+    hc.hosts_needing_reboot
 FROM host_counts hc
 CROSS JOIN hosts_needing_updates hnu
 CROSS JOIN hosts_with_security hws
